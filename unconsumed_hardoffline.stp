@@ -1,0 +1,18 @@
+#! /usr/bin/env stap
+
+probe begin
+{
+    printf("begin trace for unconsumed memory hard offline\n")
+}
+
+probe kernel.function("me_pagecache_clean")
+{
+    printf("pid:  %d\n", pid())
+    print_backtrace()
+}
+
+probe kernel.function("try_memory_failure_hugetlb")
+{
+    printf("pid:  %d\n", pid())
+    print_backtrace()
+}
