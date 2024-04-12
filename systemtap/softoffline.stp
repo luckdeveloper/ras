@@ -1,0 +1,55 @@
+#! /usr/bin/env stap
+
+probe begin
+{
+    printf("Begin trace for unconsumed/consumed memory soft offline\n")
+}
+
+probe end
+{
+    printf("End trace for unconsumed/consumed memory soft offline\n")    
+}
+
+probe kernel.function("isolate_lru_page")
+{
+    printf("enter function %s \n", ppfunc())
+    print_backtrace()
+}
+
+probe kernel.function("isolate_movable_page")
+{
+    printf("enter function %s \n", ppfunc())
+    print_backtrace()
+}
+
+probe kernel.function("migrate_pages")
+{
+    printf("enter function %s \n", ppfunc())
+    print_backtrace()
+}
+
+probe kernel.function("try_memory_failure_hugetlb")
+{
+    printf("enter function %s \n", ppfunc())
+    print_backtrace()
+}
+
+// trace failure case
+probe kernel.function("get_any_page").return
+{
+    if ($return != 1)
+    {
+        printf("function %s return %d\n", ppfunc(), $return)
+        print_backtrace()
+    }
+}
+
+//
+//probe kernel.function("HWPoisonHandlable").return
+//{
+//    if ($return != true)
+//    {
+//        printf("function %s return %d\n", ppfunc(), $return)
+//        print_backtrace()
+//    }
+//}
