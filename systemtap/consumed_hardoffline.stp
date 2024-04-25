@@ -3,26 +3,12 @@
 global fault_flags;
 global vma_flags;
 
-global VM_FAULT_HWPOISON = 0x000010
+global VM_FAULT_HWPOISON = 0x000010;
 
 probe begin 
 {
     printf("begin trace for consumed memory hard offline\n");
 
-    /* See include/linux/mm.h */
-    fault_flags[0] = "WRITE";        fault_flags[1] = "NONLINEAR";
-    fault_flags[2] = "MKWRITE";      fault_flags[3] = "ALLOW_RETRY";
-    fault_flags[4] = "RETRY_NOWAIT"; fault_flags[5] = "KILLABLE";
-    
-    vma_flags[0] = "VM_GROWSDOWN";      vma_flags[2] = "VM_PFNMAP";
-    vma_flags[3] = "VM_DENYWRITE";      vma_flags[5] = "VM_LOCKED";
-    vma_flags[6] = "VM_IO";             vma_flags[7] = "VM_SEQ_READ";
-    vma_flags[8] = "VM_RAND_READ";      vma_flags[9] = "VM_DONTCOPY";
-    vma_flags[10] = "VM_DONTEXPAND";    vma_flags[12] = "VM_ACCOUNT";
-    vma_flags[13] = "VM_NORESERVE";     vma_flags[14] = "VM_HUGETLB";
-    vma_flags[15] = "VM_NONLINEAR";     vma_flags[16] = "VM_ARCH_1";
-    vma_flags[18] = "VM_DONTDUMP";      vma_flags[20] = "VM_MIXEDMAP";
-    vma_flags[21] = "VM_HUGEPAGE";      vma_flags[22] = "VM_NOHUGEPAGE";
 }
 
 probe end
@@ -63,9 +49,9 @@ probe kernel.function("do_swap_page").return
 //  kernel.statement("do_swap_page@/build/linux-mYZaRL/linux-5.15.0/mm/memory.c:3536") $vmf:struct vm_fault* $page:struct page* $si:struct swap_info_struct* $entry:swp_entry_t $exclusive:int $ret:vm_fault_t $shadow:void*
 probe kernel.statement("do_swap_page@/build/linux-mYZaRL/linux-5.15.0/mm/memory.c:3536")
 {
-    printf("pretty printf vmf = %s\n", $vmf$$$)
-    printf("local variables: %s\n", $$locals)
-    printf("pretty printf entry = %s\n", $entry$);
+    printf("do_swap_page: pretty printf vmf = %s\n", $vmf$$$)
+    printf("do_swap_page: local variables: %s\n", $$locals)
+    printf("do_swap_page: pretty printf entry = %s\n", $entry$);
 }
 
 
@@ -107,90 +93,39 @@ probe kernel.function("__do_fault").return
     }
 }
 
-//-----------------------------------------------------------------------------
-// part 2 vm_fault()
-//-----------------------------------------------------------------------------
-function prot_str:string(prot: long) 
+probe kernel.function("handle_page_fault")
 {
-    return sprintf("%s%s%s%s",
-            (prot & 0x1) ? "r" : "-",
-            (prot & 0x2) ? "w" : "-",
-            (prot & 0x4) ? "x" : "-",
-            (prot & 0x8) ? "s" : "-");
+    printf("address: 0x%x, error code: %d\n", 
+        $address, $error_code)  
 }
 
-function vma_flags_str:string(flags: long) 
+probe kernel.function("do_user_addr_fault")
 {
-    prot = flags & 0xf;
-    mprot = (flags >> 4) & 0xf;
-    flags = flags >> 8;
-    
-    for(i = 0; i < 23; ++i) {
-        if(flags & 1) {
-            str = sprintf("%s|%s", str, vma_flags[i]);
-        }
-        
-        flags >>= 1;
-    }
-    
-    return sprintf("prot: %s may: %s flags: %s", 
-                    prot_str(prot), prot_str(mprot),
-                    substr(str, 1, strlen(str) - 1));
+    printf("address: 0x%x, error code: %d\n", 
+        $address, $error_code)  
 }
 
-function fault_flags_str:string(flags: long) 
-{
-    for(i = 0; i < 6; ++i) {
-        if(flags & 1) {
-            str = sprintf("%s|%s", str, fault_flags[i]);
-        }
-        
-        flags >>= 1;
-    }
-    
-    /* Cut first pipe sign ('|') */
-    return substr(str, 1, strlen(str) - 1);
-}
 
-function vm_fault_str(fault_type: long) 
+
+global FAULT_FLAG_WRITE =		1 << 0;
+global FAULT_FLAG_MKWRITE =		1 << 1;
+global FAULT_FLAG_ALLOW_RETRY =	1 << 2;
+global FAULT_FLAG_RETRY_NOWAIT = 	1 << 3;
+global FAULT_FLAG_KILLABLE =		1 << 4;
+global FAULT_FLAG_TRIED = 		1 << 5;
+global FAULT_FLAG_USER =		1 << 6;
+global FAULT_FLAG_REMOTE =		1 << 7;
+global FAULT_FLAG_INSTRUCTION =	1 << 8;
+global FAULT_FLAG_INTERRUPTIBLE =	1 << 9;
+
+
+probe kernel.function("handle_mm_fault")
 {
-    if(vm_fault_contains(fault_type, VM_FAULT_OOM))
-        return "OOM";
-    else if(vm_fault_contains(fault_type, VM_FAULT_SIGBUS))
-        return "SIGBUS";
-    else if(vm_fault_contains(fault_type, VM_FAULT_MINOR))
-        return "MINOR";
-    else if(vm_fault_contains(fault_type, VM_FAULT_MAJOR))
-        return "MAJOR";
-    else if(vm_fault_contains(fault_type, VM_FAULT_NOPAGE))
-        return "NOPAGE";
-    else if(vm_fault_contains(fault_type, VM_FAULT_LOCKED))
-        return "LOCKED";
-    else if(vm_fault_contains(fault_type, VM_FAULT_ERROR))
-        return "ERROR";
-    
-    // vm_fault_contains doesn't support VM_FAULT_HWPOISON, so I implement it 
-    if (fault_type & VM_FAULT_HWPOISON)
+    if (pid() == target())
     {
-        return "HWPOISON";
-    }    
-
-    return "???";
-}
-
-probe vm.pagefault 
-{
-    printf("vm.pagefault pid: %d \n", pid());
-    printf("\taddr: %p flags: %s\n", $address, fault_flags_str($flags));
-    printf("\tVMA [%p:%p]\n", $vma->vm_start, $vma->vm_end);
-    printf("\t%s\n", vma_flags_str($vma->vm_flags));
-    printf("\tamp: %p\n", $vma->anon_vma) 
-    
-    if($vma->vm_file != 0)
-        printf("\tfile: %s\n", d_name($vma->vm_file->f_path->dentry)) 
-}
-
-probe vm.pagefault.return 
-{ 
-    printf("\t => pid: %d pf: %s\n", pid(), vm_fault_str(fault_type));
+        printf("enter function %s \n", ppfunc())
+        printf("%s: pretty printf vma = %s\n", ppfunc, $vma$$$)
+        printf("%s: address :0x%x, flags :%d\n", 
+            $address, $flags)
+    }
 }
