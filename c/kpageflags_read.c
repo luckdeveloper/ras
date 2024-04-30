@@ -6,6 +6,8 @@
 #include <unistd.h> /* pread, sysconf */
 #include <errno.h>
 
+// https://www.kernel.org/doc/html/latest/admin-guide/mm/pagemap.html?highlight=kpageflags
+// https://man.archlinux.org/man/proc_kpageflags.5.en
 #define PAGE_FLAGS_LEN 8 // every page flags len in /proc/kpageflags
 
 enum page_flags_type 
