@@ -144,7 +144,8 @@ int virt_to_phys_user(uintptr_t *paddr, pid_t pid, uintptr_t vaddr)
     
     *paddr = (entry.pfn * sysconf(_SC_PAGE_SIZE)) + (vaddr % sysconf(_SC_PAGE_SIZE));
     fprintf(stdout, "%-24s 0x%-16llx\n", "physical addr", (unsigned long long)*paddr);
-     fprintf(stdout, "*-------pageflags from /proc/self/pgmap----*\n");
+    fprintf(stdout, "%-24s 0x%-16llx\n", "physcal frame number", (unsigned long long)entry.pfn);
+    fprintf(stdout, "*-------pageflags from /proc/self/pgmap----*\n");
     fprintf(stdout, "%-24s %-8d\n", "soft_dirty", entry.soft_dirty);
     fprintf(stdout, "%-24s %-8d\n", "file_page", entry.file_page);
     fprintf(stdout, "%-24s %-8d\n", "swapped", entry.swapped);

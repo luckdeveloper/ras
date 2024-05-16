@@ -5,6 +5,8 @@
 #include <stdlib.h> /* size_t */
 #include <unistd.h> /* pread, sysconf */
 #include <errno.h>
+#include <stdbool.h>
+#include <string.h>
 
 // https://www.kernel.org/doc/html/latest/admin-guide/mm/pagemap.html?highlight=kpageflags
 // https://man.archlinux.org/man/proc_kpageflags.5.en
@@ -72,13 +74,25 @@ static const char * const page_flags_str [] =
     [PF_PGTABLE]        = "pgtable",
 };
 
+typedef struct input_arg
+{   
+    int is_physical_address;
+    union kpageflags_read
+    {
+        uintptr_t physical_address;
+        uint64_t pfn;
+    }u;    
+}input_arg_s;
+
 #define PF_FLAGS_ARRAY_LEN (sizeof(page_flags_str)/sizeof(page_flags_str[0]))
 
 
-int print_usage(void);
+int parse_args(int argc, char **argv);
 uint64_t calculate_pfn(uintptr_t physical_address);
 int get_pageflags_by_pfn(uint64_t pfn, uint64_t *ret_flags);
 int print_pageflags(uint64_t flags);
+
+input_arg_s g_input_args;
 
 int main(int argc, char **argv)
 {
@@ -86,15 +100,22 @@ int main(int argc, char **argv)
     uint64_t pfn = 0;
     uint64_t flags = 0;
 
-    if (argc != 2) 
+  
+    if (EXIT_SUCCESS != parse_args(argc, argv))
     {
-        print_usage();  
         return -1;
     }
     
-    phy_addr = strtoull(argv[1], NULL, 0);
-    pfn = calculate_pfn(phy_addr);
-
+    if (g_input_args.is_physical_address)
+    {
+        phy_addr = g_input_args.u.physical_address;
+        pfn = calculate_pfn(phy_addr);
+    }
+    else
+    {
+        pfn = g_input_args.u.pfn;
+    }
+    
     if (0 != get_pageflags_by_pfn(pfn, &flags))
     {
         fprintf(stderr, "get_pageflags_by_pfn\n");
@@ -107,12 +128,63 @@ int main(int argc, char **argv)
     return EXIT_SUCCESS;
 }
 
-int print_usage(void)
-{
-    printf("kpageflags_read [physical address]\n");
-    return 0;
-}
 
+
+int parse_args(int argc, char **argv)
+{
+    char *physical_address = NULL;  
+    char *pysical_frame_number = NULL;  
+    int found_a = 0;  
+    int found_n = 0;  
+  
+    if (argc < 2) {  
+        fprintf(stderr, "Usage: %s -a physical_address -n pysical_frame_number\n", argv[0]);  
+        return EXIT_FAILURE;  
+    }  
+  
+    for (int i = 1; i < argc; ++i) 
+    {  
+        if (strcmp(argv[i], "-a") == 0) 
+        {  
+            if (i + 1 >= argc || argv[i + 1][0] == '-') {  
+                fprintf(stderr, "Error: Missing parameter for -a\n");  
+                return EXIT_FAILURE;  
+            }  
+            physical_address = argv[i + 1];  
+            g_input_args.is_physical_address = true;
+            g_input_args.u.physical_address = strtoull(physical_address, NULL, 0);
+
+            found_a = 1;  
+            i++; // Skip the next argument (which is the parameter for -a)  
+        } 
+        else if (strcmp(argv[i], "-n") == 0) 
+        {  
+            if (i + 1 >= argc || argv[i + 1][0] == '-') 
+            {  
+                fprintf(stderr, "Error: Missing parameter for -n");  
+                return EXIT_FAILURE;  
+            }  
+            pysical_frame_number = argv[i + 1];  
+            g_input_args.is_physical_address = false;
+            g_input_args.u.pfn = strtoull(pysical_frame_number, NULL, 0);
+            found_n = 1;  
+            i++; // Skip the next argument (which is the parameter for -n)  
+        } 
+        else 
+        {  
+            fprintf(stderr, "Error: Unrecognized option '%s'\n", argv[i]);  
+            return EXIT_FAILURE;  
+        }  
+    }  
+  
+    if (!found_a && !found_n)
+    {  
+        fprintf(stderr, "Error: either -a or -n options is required\n");  
+        return EXIT_FAILURE;  
+    }  
+  
+    return EXIT_SUCCESS;  
+}
 
 size_t get_page_size()
 {
