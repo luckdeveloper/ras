@@ -3,7 +3,7 @@
 global fault_flags;
 global vma_flags;
 
-global VM_FAULT_HWPOISON = 0x000010;
+global VM_FAULT_HWPOISON = 0x000010
 
 probe begin 
 {
@@ -49,9 +49,9 @@ probe kernel.function("do_swap_page").return
 //  kernel.statement("do_swap_page@/build/linux-mYZaRL/linux-5.15.0/mm/memory.c:3536") $vmf:struct vm_fault* $page:struct page* $si:struct swap_info_struct* $entry:swp_entry_t $exclusive:int $ret:vm_fault_t $shadow:void*
 probe kernel.statement("do_swap_page@/build/linux-mYZaRL/linux-5.15.0/mm/memory.c:3536")
 {
-    printf("do_swap_page: pretty printf vmf = %s\n", $vmf$$$)
-    printf("do_swap_page: local variables: %s\n", $$locals)
-    printf("do_swap_page: pretty printf entry = %s\n", $entry$);
+    printf("pretty printf vmf = %s\n", $vmf$$$)
+    printf("local variables: %s\n", $$locals)
+    printf("pretty printf entry = %s\n", $entry$);
 }
 
 
@@ -105,27 +105,13 @@ probe kernel.function("do_user_addr_fault")
         $address, $error_code)  
 }
 
-
-
-global FAULT_FLAG_WRITE =		1 << 0;
-global FAULT_FLAG_MKWRITE =		1 << 1;
-global FAULT_FLAG_ALLOW_RETRY =	1 << 2;
-global FAULT_FLAG_RETRY_NOWAIT = 	1 << 3;
-global FAULT_FLAG_KILLABLE =		1 << 4;
-global FAULT_FLAG_TRIED = 		1 << 5;
-global FAULT_FLAG_USER =		1 << 6;
-global FAULT_FLAG_REMOTE =		1 << 7;
-global FAULT_FLAG_INSTRUCTION =	1 << 8;
-global FAULT_FLAG_INTERRUPTIBLE =	1 << 9;
-
-
 probe kernel.function("handle_mm_fault")
 {
     if (pid() == target())
     {
         printf("enter function %s \n", ppfunc())
-        printf("%s: pretty printf vma = %s\n", ppfunc, $vma$$$)
-        printf("%s: address :0x%x, flags :%d\n", 
+        printf("pretty printf vmf = %s\n", $vma$$$)
+        printf("address :0x%x, flags :%d\n", 
             $address, $flags)
     }
 }

@@ -14,24 +14,28 @@ probe kernel.function("isolate_lru_page")
 {
     printf("enter function %s \n", ppfunc())
     print_backtrace()
+    printf("leave function %s \n", ppfunc())   
 }
 
 probe kernel.function("isolate_movable_page")
 {
     printf("enter function %s \n", ppfunc())
     print_backtrace()
+    printf("leave function %s \n", ppfunc())   
 }
 
 probe kernel.function("migrate_pages")
 {
     printf("enter function %s \n", ppfunc())
     print_backtrace()
+    printf("leave function %s \n", ppfunc())   
 }
 
 probe kernel.function("try_memory_failure_hugetlb")
 {
     printf("enter function %s \n", ppfunc())
     print_backtrace()
+    printf("leave function %s \n", ppfunc())   
 }
 
 // trace failure case
